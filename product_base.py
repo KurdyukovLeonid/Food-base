@@ -6,19 +6,26 @@ import asyncio
 from keyboards import *
 import crud_functions
 
-api = '7002348615:AAGc2k-Avt-GZmhE5TsPcQ5x9X8vnLr0uz0'
+api = ''
 bot = Bot(token=api)
 dp = Dispatcher(bot, storage=MemoryStorage())
 
 crud_functions.initiate_db()
 
-crud_functions.populate_db()
+
+# crud_functions.populate_db()
 
 
 class UserState(StatesGroup):
     age = State()
     growth = State()
     weight = State()
+
+
+class RegistrationState(StatesGroup):
+    username = State()
+    email = State()
+    age = State()
 
 
 @dp.message_handler(commands=['start'])
@@ -88,6 +95,43 @@ async def get_buying_list(message):
 async def send_confirm_message(call):
     await call.message.answer("Вы успешно приобрели продукт!")
     await call.answer()
+
+
+@dp.message_handler(text='Регистрация')
+async def sing_up(message):
+    await message.answer('Введите имя пользователя (только латинский алфавит):')
+    await RegistrationState.username.set()
+
+
+@dp.message_handler(state=RegistrationState.username)
+async def set_username(message, state: FSMContext):
+    username = message.text
+    if crud_functions.is_included(username):
+        await message.answer("Пользователь уже существует, введите другое имя:")
+    else:
+        await state.update_data(username=username)
+        await message.answer('Введите свой email:')
+        await RegistrationState.email.set()
+
+
+@dp.message_handler(state=RegistrationState.email)
+async def set_email(message, state: FSMContext):
+    email = message.text
+    await state.update_data(email=email)
+    await message.answer('Введите свой возраст:')
+    await RegistrationState.age.set()
+
+
+@dp.message_handler(state=RegistrationState.age)
+async def set_age(message, state: FSMContext):
+    age = message.text
+    data = await state.get_data()
+    username = data.get('username')
+    email = data.get('email')
+
+    crud_functions.add_user(username, email, age)
+    await message.answer("Вы успешно зарегистрированы!")
+    await state.finish()
 
 
 if __name__ == '__main__':
